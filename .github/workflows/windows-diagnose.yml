@@ -1,0 +1,39 @@
+name: Diagnose Windows package
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnose:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: zhenguojian-windows-x64
+          run-id: '41812527029'
+          github-token: ${{ github.token }}
+          path: package
+      - name: Install fixture tools
+        run: choco install ffmpeg --yes --no-progress
+      - name: Diagnose startup and playback
+        shell: pwsh
+        run: |
+          Expand-Archive -Path (Get-ChildItem package/*windows-x64.zip).FullName -DestinationPath bundle
+          $dir = (Resolve-Path bundle).Path
+          & ffmpeg -v error -y -f lavfi -i testsrc2=size=160x90:rate=12 -t 3 -c:v libx264 -threads 1 "$dir/fixture.mp4"
+          $process = Start-Process "$dir/zhenguojian.exe" -ArgumentList @('--package-smoke', "$dir/result.json", "$dir/fixture.mp4") -WorkingDirectory $dir -RedirectStandardOutput "$dir/stdout.txt" -RedirectStandardError "$dir/stderr.txt" -PassThru
+          if (!$process.WaitForExit(90000)) { $process.Kill(); 'timeout' | Out-File "$dir/timeout.txt" }
+          "ExitCode=$($process.ExitCode)" | Tee-Object -FilePath "$dir/exit.txt"
+          Get-Content "$dir/result.json" -ErrorAction SilentlyContinue
+          Get-Content "$dir/stdout.txt" -ErrorAction SilentlyContinue
+          Get-Content "$dir/stderr.txt" -ErrorAction SilentlyContinue
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-diagnostic-report
+          path: |
+            bundle/*.json
+            bundle/*.txt
+          if-no-files-found: error
