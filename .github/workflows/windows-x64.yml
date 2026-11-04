@@ -32,6 +32,9 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
           'C:\msys64\mingw64\bin' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Refresh unavailable pinned media archive
+        run: >-
+          python -c "from pathlib import Path; p=Path('packages/media_kit_libs_windows_video/windows/CMakeLists.txt'); s=p.read_text(); s=s.replace('20260921','20261104').replace('e76a35ec95','46787be250').replace('361392d64a231830ac79d1c0f91ddb68c6a709accd282b2c87b13889d382fdec','5ae0aaa85b2e690e9c574a44e10a86f3d5fe4b406ef6dfa684f5ab25e6bf6306'); p.write_text(s)"
       - name: Resolve missing lockfile dependencies
         run: flutter pub get
       - name: Build full Windows package
@@ -41,6 +44,7 @@ jobs:
         run: |
           git rev-parse HEAD | Out-File dist/windows/SOURCE_COMMIT.txt -Encoding utf8
           Copy-Item pubspec.lock dist/windows/pubspec.lock
+          Copy-Item packages/media_kit_libs_windows_video/windows/CMakeLists.txt dist/windows/media-CMakeLists.txt
       - name: Upload Windows package
         uses: actions/upload-artifact@v4
         with:
